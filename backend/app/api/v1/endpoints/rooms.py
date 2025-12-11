@@ -15,6 +15,20 @@ async def create_room_endpoint(db: AsyncSession = Depends(get_db)):
     room_id = await room_service.create_new_room(db)
     return {"room_id": room_id}
 
+from pydantic import BaseModel
+
+class SaveCodeRequest(BaseModel):
+    code: str
+
+@router.put("/rooms/{room_id}/code")
+async def save_room_code_endpoint(room_id: str, payload: SaveCodeRequest, db: AsyncSession = Depends(get_db)):
+    """
+    PUT /rooms/{room_id}/code
+    Explicitly saves the code content for a room.
+    """
+    await room_service.update_room_code(db, room_id, payload.code)
+    return {"message": "Code saved successfully"}
+
 @router.post("/autocomplete", response_model=AutocompleteResponse)
 async def autocomplete_endpoint(payload: AutocompleteRequest):
     """

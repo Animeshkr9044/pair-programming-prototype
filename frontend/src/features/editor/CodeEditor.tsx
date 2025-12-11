@@ -8,11 +8,11 @@ const CodeEditor: React.FC = () => {
   const [code, setCode] = useState<string>("// Start coding...");
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  
+
   // Refs for WebSocket and Debounce Timer
   const socketRef = useRef<WebSocket | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
-  
+
   // Prevent infinite loops: "Remote update" vs "User typing"
   const isRemoteUpdate = useRef(false);
 
@@ -32,11 +32,11 @@ const CodeEditor: React.FC = () => {
     ws.onmessage = (event) => {
       // Received code from another user
       const newCode = event.data;
-      
+
       // Mark as remote update so we don't send it back
       isRemoteUpdate.current = true;
       setCode(newCode);
-      
+
       // Reset flag after render cycle
       setTimeout(() => {
         isRemoteUpdate.current = false;
@@ -96,7 +96,7 @@ const CodeEditor: React.FC = () => {
     if (!suggestion) return;
     const newCode = code + "\n" + suggestion;
     setCode(newCode);
-    
+
     // Broadcast the accepted suggestion
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(newCode);
@@ -110,14 +110,19 @@ const CodeEditor: React.FC = () => {
       <div style={styles.header}>
         <h3>Room: <span style={styles.roomId}>{roomId}</span></h3>
         <div style={styles.status}>
-          Status: 
-          <span style={{ 
-            color: isConnected ? '#28a745' : '#dc3545', 
-            fontWeight: 'bold', 
-            marginLeft: '5px' 
+          Status:
+          <span style={{
+            color: isConnected ? '#28a745' : '#dc3545',
+            fontWeight: 'bold',
+            marginLeft: '5px'
           }}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
+          <button onClick={() => {
+            if (roomId) api.saveRoomCode(roomId, code).then(() => alert('Code saved!'));
+          }} style={styles.saveButton}>
+            Save Code
+          </button>
         </div>
       </div>
 
@@ -134,7 +139,7 @@ const CodeEditor: React.FC = () => {
             fontSize: 14,
           }}
         />
-        
+
         {/* AI Suggestion Overlay (Simple implementation) */}
         {suggestion && (
           <div style={styles.suggestionBox}>
@@ -175,6 +180,19 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   status: {
     fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px'
+  },
+  saveButton: {
+    backgroundColor: '#28a745',
+    color: 'white',
+    border: 'none',
+    padding: '6px 15px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '12px',
   },
   editorWrapper: {
     flex: 1,

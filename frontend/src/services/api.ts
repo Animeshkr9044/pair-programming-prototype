@@ -8,7 +8,11 @@ export const api = {
     const response = await axios.post(`${API_URL}/rooms`);
     return response.data; // Expecting { room_id: "..." }
   },
-  
+
+  saveRoomCode: async (roomId: string, code: string) => {
+    await axios.put(`${API_URL}/rooms/${roomId}/code`, { code });
+  },
+
   getAutocomplete: async (code: string, cursorPosition: number) => {
     const response = await axios.post(`${API_URL}/autocomplete`, {
       code,
