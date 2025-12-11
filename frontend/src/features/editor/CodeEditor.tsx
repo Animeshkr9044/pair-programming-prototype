@@ -9,6 +9,10 @@ const CodeEditor: React.FC = () => {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
+  // Execution State
+  const [output, setOutput] = useState<{ stdout: string; stderr: string; exit_code: number } | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
+
   // Refs for WebSocket and Debounce Timer
   const socketRef = useRef<WebSocket | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
@@ -104,6 +108,21 @@ const CodeEditor: React.FC = () => {
     setSuggestion(null);
   };
 
+  // --- 5. Run Code Logic ---
+  const handleRunCode = async () => {
+    setIsExecuting(true);
+    setOutput(null);
+    try {
+      const result = await api.executeCode(code);
+      setOutput(result);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to run code.");
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       {/* Header / Status Bar */}
@@ -118,18 +137,27 @@ const CodeEditor: React.FC = () => {
           }}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
-          <button onClick={() => {
-            if (roomId) api.saveRoomCode(roomId, code).then(() => alert('Code saved!'));
-          }} style={styles.saveButton}>
-            Save Code
-          </button>
+          <div style={styles.actions}>
+            <button onClick={() => {
+              if (roomId) api.saveRoomCode(roomId, code).then(() => alert('Code saved!'));
+            }} style={styles.saveButton}>
+              Save Code
+            </button>
+            <button
+              onClick={handleRunCode}
+              disabled={isExecuting}
+              style={{ ...styles.runButton, opacity: isExecuting ? 0.7 : 1 }}
+            >
+              {isExecuting ? 'Running...' : '▶ Run Code'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Editor Area */}
+      {/* Editor & Output Split View */}
       <div style={styles.editorWrapper}>
         <Editor
-          height="85vh"
+          height="70vh"
           defaultLanguage="python"
           value={code}
           onChange={handleEditorChange}
@@ -139,6 +167,22 @@ const CodeEditor: React.FC = () => {
             fontSize: 14,
           }}
         />
+
+        {/* Output Panel */}
+        <div style={styles.outputPanel}>
+          <div style={styles.outputTitle}>Output Console</div>
+          {output ? (
+            <pre style={styles.outputContent}>
+              {output.stdout && <span style={{ color: '#ccc' }}>{output.stdout}</span>}
+              {output.stderr && <span style={{ color: '#ff6b6b' }}>{output.stderr}</span>}
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                Exited with code: {output.exit_code}
+              </div>
+            </pre>
+          ) : (
+            <div style={styles.emptyOutput}>Click "Run Code" to execute.</div>
+          )}
+        </div>
 
         {/* AI Suggestion Overlay (Simple implementation) */}
         {suggestion && (
@@ -184,6 +228,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: 'center',
     gap: '15px'
   },
+  actions: {
+    display: 'flex',
+    gap: '10px',
+  },
   saveButton: {
     backgroundColor: '#28a745',
     color: 'white',
@@ -194,13 +242,54 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: 'bold',
     fontSize: '12px',
   },
+  runButton: {
+    backgroundColor: '#EAB308',
+    color: 'black',
+    border: 'none',
+    padding: '6px 15px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '12px',
+  },
   editorWrapper: {
     flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
     position: 'relative',
+  },
+  outputPanel: {
+    height: '30vh',
+    borderTop: '1px solid #444',
+    backgroundColor: '#1e1e1e',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  outputTitle: {
+    padding: '5px 15px',
+    backgroundColor: '#252526',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    color: '#aaa',
+    borderBottom: '1px solid #333',
+  },
+  outputContent: {
+    flex: 1,
+    padding: '15px',
+    margin: 0,
+    fontFamily: 'monospace',
+    fontSize: '13px',
+    overflow: 'auto',
+  },
+  emptyOutput: {
+    padding: '20px',
+    color: '#555',
+    fontStyle: 'italic',
+    fontSize: '13px',
   },
   suggestionBox: {
     position: 'absolute',
-    bottom: '20px',
+    bottom: '32vh', // Moved up to account for output panel
     right: '20px',
     backgroundColor: '#252526',
     border: '1px solid #007acc',

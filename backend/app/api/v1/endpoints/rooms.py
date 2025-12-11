@@ -29,6 +29,51 @@ async def save_room_code_endpoint(room_id: str, payload: SaveCodeRequest, db: As
     await room_service.update_room_code(db, room_id, payload.code)
     return {"message": "Code saved successfully"}
 
+import subprocess
+import sys
+
+class ExecuteRequest(BaseModel):
+    code: str
+
+@router.post("/execute")
+async def execute_code_endpoint(payload: ExecuteRequest):
+    """
+    POST /execute
+    Executes the Python code and returns stdout/stderr.
+    WARNING: This is a prototype and has security risks.
+    """
+    code = payload.code
+    
+    try:
+        # Run the code in a subprocess
+        # -c flag allows running a string as a script
+        # capture_output=True captures stdout and stderr
+        # text=True decodes bytes to string
+        # timeout=5 prevents infinite loops
+        result = subprocess.run(
+            [sys.executable, "-c", code], 
+            capture_output=True, 
+            text=True, 
+            timeout=5
+        )
+        return {
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "exit_code": result.returncode
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "stdout": "",
+            "stderr": "Error: Execution timed out (limit: 5 seconds)",
+            "exit_code": 1
+        }
+    except Exception as e:
+        return {
+            "stdout": "",
+            "stderr": f"Error: {str(e)}",
+            "exit_code": 1
+        }
+
 @router.post("/autocomplete", response_model=AutocompleteResponse)
 async def autocomplete_endpoint(payload: AutocompleteRequest):
     """

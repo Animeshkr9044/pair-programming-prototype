@@ -13,6 +13,11 @@ export const api = {
     await axios.put(`${API_URL}/rooms/${roomId}/code`, { code });
   },
 
+  executeCode: async (code: string) => {
+    const response = await axios.post(`${API_URL}/execute`, { code });
+    return response.data; // Expecting { stdout, stderr, exit_code }
+  },
+
   getAutocomplete: async (code: string, cursorPosition: number) => {
     const response = await axios.post(`${API_URL}/autocomplete`, {
       code,
