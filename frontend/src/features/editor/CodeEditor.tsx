@@ -108,18 +108,79 @@ const CodeEditor: React.FC = () => {
     setSuggestion(null);
   };
 
-  // --- 5. Run Code Logic ---
+  // Worker Ref
+  const workerRef = useRef<Worker | null>(null);
+
+  // Helper to attach listeners to a worker instance
+  const attachWorkerListeners = useCallback((worker: Worker) => {
+    worker.onmessage = (event) => {
+      const { type, content } = event.data;
+
+      if (type === 'output') {
+        setOutput((prev) => ({
+          stdout: (prev?.stdout || "") + content + "\n",
+          stderr: prev?.stderr || "",
+          exit_code: 0
+        }));
+      } else if (type === 'error') {
+        setOutput((prev) => ({
+          stdout: prev?.stdout || "",
+          stderr: (prev?.stderr || "") + content + "\n",
+          exit_code: 1
+        }));
+        setIsExecuting(false);
+      } else if (type === 'loaded') {
+        console.log("Pyodide Ready");
+      }
+    };
+  }, []);
+
+  // --- 0. Initialize Pyodide Worker ---
+  useEffect(() => {
+    // Create code
+    const worker = new Worker(new URL('./pyodide.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    workerRef.current = worker;
+    attachWorkerListeners(worker);
+
+    return () => {
+      worker.terminate();
+    };
+  }, [attachWorkerListeners]);
+
+  // --- 5. Run Code Logic (Wasm) ---
   const handleRunCode = async () => {
+    if (!workerRef.current) return;
+
     setIsExecuting(true);
-    setOutput(null);
-    try {
-      const result = await api.executeCode(code);
-      setOutput(result);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to run code.");
-    } finally {
+    setOutput({ stdout: "", stderr: "", exit_code: 0 }); // Clear previous output
+
+    // Post code to worker
+    workerRef.current.postMessage(code);
+
+    // Simple timeout to "fake" end of execution state 
+    // (Real implementation needs a done signal from python)
+    setTimeout(() => {
       setIsExecuting(false);
+    }, 1000);
+  };
+
+  const handleStopExecution = () => {
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      // We must restart the worker because terminate kills it entirely
+      const newWorker = new Worker(new URL('./pyodide.worker.ts', import.meta.url), { type: 'module' });
+      workerRef.current = newWorker;
+
+      attachWorkerListeners(newWorker);
+
+      setIsExecuting(false);
+      setOutput((prev) => ({
+        stdout: prev?.stdout || "",
+        stderr: (prev?.stderr || "") + "\n[Execution Terminated by User]",
+        exit_code: 137
+      }));
     }
   };
 
@@ -143,13 +204,22 @@ const CodeEditor: React.FC = () => {
             }} style={styles.saveButton}>
               Save Code
             </button>
-            <button
-              onClick={handleRunCode}
-              disabled={isExecuting}
-              style={{ ...styles.runButton, opacity: isExecuting ? 0.7 : 1 }}
-            >
-              {isExecuting ? 'Running...' : '▶ Run Code'}
-            </button>
+
+            {isExecuting ? (
+              <button
+                onClick={handleStopExecution}
+                style={styles.stopButton}
+              >
+                ⬛ Stop
+              </button>
+            ) : (
+              <button
+                onClick={handleRunCode}
+                style={styles.runButton}
+              >
+                ▶ Run Code
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -251,6 +321,17 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     fontWeight: 'bold',
     fontSize: '12px',
+  },
+  stopButton: {
+    backgroundColor: '#dc3545',
+    color: 'white',
+    border: 'none',
+    padding: '6px 15px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    animation: 'pulse 1.5s infinite', // Optional visual feedback
   },
   editorWrapper: {
     flex: 1,
