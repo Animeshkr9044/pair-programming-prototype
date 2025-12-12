@@ -94,7 +94,67 @@ Access at http://localhost:5173 (usually).
         *   *Scalability*: Code runs in the user's browser, meaning 0% load on our backend servers regardless of user count.
         *   *Privacy*: Code execution happens locally; sensitive logic never leaves the user's machine.
         *   *Security*: Browsers provide a hardened sandbox, unlike running arbitrary code on a backend container.
+---
 
+## 🔌 API Reference
+
+### 1. Create a Room
+Creates a new session and returns a unique `room_id`.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/rooms
+```
+
+**Response:**
+```json
+{
+  "room_id": "a1b2c3d4"
+}
+```
+
+### 2. Autocomplete (Mocked)
+Get a code suggestion based on current input.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/autocomplete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "def my_func",
+    "cursorPosition": 11,
+    "language": "python"
+  }'
+```
+
+**Response:**
+```json
+{
+  "suggestion": "tion():\n    pass"
+}
+```
+
+### 3. Execute Code (Unsafe & Unused)
+Executes Python code and returns output.
+> **Note**: This endpoint is currently **unused** by the frontend. The application now uses **WebAssembly (Pyodide)** to run code directly in the browser for better performance and security. This endpoint remains only for testing or fallback purposes.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "print(1 + 1)"
+  }'
+```
+
+**Response:**
+```json
+{
+  "stdout": "2\n",
+  "stderr": "",
+  "exit_code": 0
+}
+```
 ---
 
 ## 🔮 Future Improvements
