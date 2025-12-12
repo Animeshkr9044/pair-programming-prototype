@@ -155,6 +155,34 @@ curl -X POST http://localhost:8000/execute \
   "exit_code": 0
 }
 ```
+
+### 4. Save Room Code
+Manually save the code content to the database.
+
+**Request:**
+```bash
+curl -X PUT http://localhost:8000/rooms/{room_id}/code \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "print(\"Saved Code\")"
+  }'
+```
+
+**Response:**
+```json
+{
+  "message": "Code saved successfully"
+}
+```
+
+### 5. WebSocket (Real-Time Collaboration)
+Connect to this endpoint to receive and send code updates.
+
+**URL:** `ws://localhost:8000/ws/{room_id}`
+
+**Protocol:**
+- **Send**: Text string of the full code content.
+- **Receive**: Text string of the full code content (broadcast from other users).
 ---
 
 ## 🔮 Future Improvements
