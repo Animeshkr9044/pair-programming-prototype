@@ -1,97 +1,116 @@
 # Pair Programming Application
 
-A real-time collaborative code editor where multiple users can code together in the same room with AI-powered autocomplete suggestions.
+A real-time collaborative code editor allowing multiple users to code together in the same room. Featured with rudimentary AI autocomplete mocking and code execution capabilities.
 
-## What It Does
+## 🚀 How to Run
 
-- **Create/Join Rooms**: Users can create new coding rooms or join existing ones with a room ID
-- **Real-Time Collaboration**: Code changes are synchronized across all users in the same room via WebSocket
-- **AI Autocomplete**: Provides code suggestions as you type (currently mocked)
-- **Monaco Editor**: Full-featured code editor with syntax highlighting
+### Prerequisites
+- **Docker** and **Docker Compose** installed.
+- **Node.js** (for local frontend dev, optional).
+- **Python 3.10+** (for local backend dev, optional).
 
-## Architecture
-
-- **Backend**: FastAPI (Python) - REST API + WebSocket server
-- **Frontend**: React + TypeScript + Vite - User interface
-- **Database**: PostgreSQL - Stores room data
-- **Real-Time**: WebSocket - Synchronizes code changes between users
-
-## Setup
-
-### 1. Database (PostgreSQL)
-
-Start PostgreSQL using Docker:
+### Method 1: Automated Script (Recommended)
+This requires **Docker** to be running. It handles verification and startup for you.
 
 ```bash
-docker-compose up -d
+# Give execution permission
+chmod +x setup.sh
+
+# Run the setup script
+./setup.sh
 ```
 
-Or manually:
+### Method 2: Docker Compose (Manual)
+If you prefer running the commands yourself:
+
 ```bash
-docker run -d \
-  --name pair-programming-db \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=pair_programming \
+docker-compose up --build -d
+```
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
+### Method 3: Manual Setup
+
+#### 1. Database
+Start a PostgreSQL instance (or use Docker for just the DB):
+```bash
+docker run -d --name pair-programming-db \
+  -e POSTGRES_USER=user \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=pair_prog_db \
   -p 5432:5432 \
-  postgres:16-alpine
+  postgres:13
 ```
 
-### 2. Backend
-
+#### 2. Backend
 ```bash
 cd backend
-
-# Create virtual environment (if using uv)
-uv venv
-
-# Activate virtual environment
-source .venv/bin/activate  # On macOS/Linux
-# or
-.venv\Scripts\activate  # On Windows
+# Create and activate venv
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # Install dependencies
-uv pip install -r requirements.txt
+pip install -r requirements.txt
 
-# Create .env file
-echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/pair_programming" > .env
-
-# Run the server
+# Run server (ensure DATABASE_URL env var is set if not using default)
+export DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/pair_prog_db"
 uvicorn app.main:app --reload
 ```
 
-Backend runs on: `http://127.0.0.1:8000`
-
-### 3. Frontend
-
+#### 3. Frontend
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start dev server
 npm run dev
 ```
+Access at http://localhost:5173 (usually).
 
-Frontend runs on: `http://localhost:5173`
+---
 
-## How It Works
+## 🏗 Architecture & Design Choices
 
-1. **Room Creation**: Frontend calls `POST /rooms` → Backend creates room in database → Returns room ID
-2. **Code Editing**: User types in Monaco Editor → Changes sent via WebSocket → Broadcasted to all users in room
-3. **Autocomplete**: User stops typing → Frontend calls `POST /autocomplete` → Backend returns suggestion
-4. **Real-Time Sync**: WebSocket connection (`/ws/{room_id}`) keeps all clients synchronized
+### Core Components
+1.  **Backend (FastAPI)**:
+    *   Selected for its high performance and native support for asynchronous programming, which is crucial for handling multiple WebSocket connections efficiently.
+    *   **WebSockets**: Used for real-time bidirectional communication. When a user types, changes are broadcast to all other users in the room immediately.
+    *   **SQLAlchemy (Async)**: Used for non-blocking database operations.
 
-## API Endpoints
+2.  **Frontend (React + Vite)**:
+    *   **Vite**: Chosen for lightning-fast build times and hot module replacement (HMR).
+    *   **Monaco Editor**: The industry-standard web code editor (VS Code's core), providing rich syntax highlighting and editing features.
+    *   **WebSocket Integration**: The frontend maintains a persistent socket connection to sync state.
 
-- `POST /rooms` - Create a new room
-- `POST /autocomplete` - Get AI code suggestion
-- `WebSocket /ws/{room_id}` - Real-time code synchronization
+3.  **Database (PostgreSQL)**:
+    *   Reliable implementation for storing persistent data (Rooms).
 
-## Testing
+### Design Decisions
+*   **Room-Based Collaboration**: No mandatory user accounts allowed for quick, friction-less sessions. Users just join a "room".
+*   **Mocked AI**: The autocomplete endpoint (`/autocomplete`) is defined but currently returns hardcoded suggestions. This allows the frontend UI to be built and tested without a heavy GPU dependency on the backend.
+*   **Code Execution Strategy**: 
+    *   **Current Prototype**: Implemented using `subprocess` for immediate feedback.
+    *   **Target Architecture**: Client-side execution via **WebAssembly (Pyodide)**.
+        *   *Scalability*: Code runs in the user's browser, meaning 0% load on our backend servers regardless of user count.
+        *   *Privacy*: Code execution happens locally; sensitive logic never leaves the user's machine.
+        *   *Security*: Browsers provide a hardened sandbox, unlike running arbitrary code on a backend container.
 
-```bash
-cd backend
-pytest
-```
+---
+
+## 🔮 Future Improvements
+
+1.  **Real AI Integration**: Replace the mock implementation in `rooms.py` with a real call to an LLM provider (e.g., OpenAI API or local model) to provide context-aware code completions.
+2.  **Client-Side Execution (WebAssembly)**: Move execution from the backend to the frontend using **Pyodide**. 
+    *   This eliminates the risk of malicious server-side code execution.
+    *   Allows for "always-on" availability even without internet for the execution engine.
+    *   Reduces infrastructure costs to near zero for compure.
+3.  **User Authentication**: Add persistent user profiles to track history and permissions within rooms.
+4.  **Operational Transformation (OT) / CRDTs**: Currently, the collaboration relies on basic broadcasting. Implementing OT (like Yjs) would handle conflict resolution much better during high-concurrency editing.
+
+---
+
+## ⚠️ Limitations
+
+*   **Security Risk**: The `/execute` endpoint runs code directly on the host/container shell. **Do not run malicious code** (e.g., `rm -rf /`).
+*   **Mocked Features**: `AutoComplete` is currently a placeholder and does not generate real code.
+*   **No Persistence**: If the container/database volume is destroyed, room history is lost (unless volumes are properly mapped).
